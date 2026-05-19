@@ -1,41 +1,47 @@
-from fastapi import FastAPI, UploadFile, File
-import shutil
-import os
-from audio_processor import generate_spectrogram
-from model_inference import analyze_spectrogram
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-app = FastAPI(title="EchoGuard API")
+from backend.app.database.mongodb import lifespan
+from backend.api.routes import router
+from backend.config import (
+    ALLOWED_HOSTS,
+    API_TITLE,
+    API_VERSION,
+    CORS_ORIGINS,
+    IS_PRODUCTION,
+    UPLOAD_DIR,
+    ensure_directories,
+)
 
-# Create temporary directories to hold files during processing
-os.makedirs("temp_audio", exist_ok=True)
-os.makedirs("temp_images", exist_ok=True)
+app = FastAPI(
+    title=API_TITLE,
+    version=API_VERSION,
+    lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
 
-@app.post("/analyze")
-async def analyze_audio_endpoint(audio_file: UploadFile = File(...)):
-    print(f"\n📥 Received file: {audio_file.filename}")
-    
-    # 1. Save the uploaded audio to a temporary file
-    temp_audio_path = f"temp_audio/{audio_file.filename}"
-    with open(temp_audio_path, "wb") as buffer:
-        shutil.copyfileobj(audio_file.file, buffer)
-        
-    # 2. Process Audio -> Image (Using the script you just tested)
-    output_image_path = f"temp_images/spec_{audio_file.filename}.png"
-    generated_image = generate_spectrogram(temp_audio_path, output_image_path)
-    
-    if not generated_image:
-        return {"error": "Failed to generate spectrogram."}
-        
-    # 3. Analyze Image -> Threat Score (Using our dummy AI)
-    # Set force_fake=True so you get a scary "Red" result for your PPT screenshot
-    ai_result = analyze_spectrogram(generated_image)
-    
-    # 4. Cleanup (Delete the temp audio to save hard drive space)
-    os.remove(temp_audio_path)
-    
-    # 5. Return the JSON payload to the frontend
-    return {
-        "filename": audio_file.filename,
-        "analysis": ai_result,
-        "spectrogram_path": generated_image
-    }
+if ALLOWED_HOSTS != ["*"]:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+@app.get("/")
+async def root():
+    return {"service": "echoguard-api", "status": "ok"}
+
+ensure_directories()
+app.mount("/assets", StaticFiles(directory=str(UPLOAD_DIR)), name="assets")
+app.include_router(router)

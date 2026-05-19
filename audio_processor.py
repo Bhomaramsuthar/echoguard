@@ -12,7 +12,7 @@ def generate_spectrogram(audio_path, output_image_path, duration=5.0):
     try:
         # 1. Load and Standardize the Audio
         # sr=22050 is the standard sample rate. We strictly enforce a 5-second duration.
-        print(f"⏳ Loading audio: {audio_path}...")
+        print(f"Loading audio: {audio_path}...")
         y, sr = librosa.load(audio_path, sr=22050, duration=duration)
         
         # 2. Array Padding (The Critical Step)
@@ -24,7 +24,7 @@ def generate_spectrogram(audio_path, output_image_path, duration=5.0):
 
         # 3. Fast Fourier Transform (Time Domain -> Frequency Domain)
         # n_fft defines the window size, hop_length is the stride of the sliding window.
-        print("🧮 Calculating Mel-Spectrogram matrix...")
+        print("Calculating Mel-Spectrogram matrix...")
         melspec = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=2048, hop_length=512, n_mels=128)
         
         # Human ears perceive sound logarithmically, not linearly. 
@@ -46,11 +46,11 @@ def generate_spectrogram(audio_path, output_image_path, duration=5.0):
         plt.savefig(output_image_path, bbox_inches='tight', pad_inches=0, transparent=True)
         plt.close()
         
-        print(f"✅ Success! Spectrogram saved cleanly to: {output_image_path}")
+        print(f"Success! Spectrogram saved cleanly to: {output_image_path}")
         return output_image_path
 
     except Exception as e:
-        print(f"❌ Pipeline Failure - Error processing audio: {e}")
+        print(f"Pipeline failure - error processing audio: {e}")
         return None
 
 # --- Local Testing Block ---
